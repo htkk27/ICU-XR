@@ -1,0 +1,382 @@
+{
+  "schema_version": "1.0",
+  "scenario_meta": {
+    "id": "icu_scenario_tachycardia",
+    "title": "ΜΕΘ: Ταχυκαρδία & Αρρυθμία - Κλιμάκωση",
+    "description": "Σενάριο διαχείρισης ξαφνικής ταχυκαρδίας με αιμοδυναμική αστάθεια, λήψη αποφάσεων και τεκμηρίωση.",
+    "estimated_duration_minutes": 10,
+    "difficulty": "Advanced",
+    "learning_goals": [
+      "Αναγνώριση κρίσιμης ταχυκαρδίας (HR > 150)",
+      "Αξιολόγηση αιμοδυναμικής σταθερότητας",
+      "Εφαρμογή πρωτοκόλλου αντιμετώπισης αρρυθμίας",
+      "Έγκαιρη κλιμάκωση και τεκμηρίωση στο EHR"
+    ]
+  },
+  "initial_state": {
+    "time_elapsed": 0,
+    "current_score": 50,
+    "flags": {
+      "assessment_complete": false,
+      "oxygen_adjusted": false,
+      "documentation_1_complete": false,
+      "escalation_complete": false,
+      "documentation_2_complete": false
+    },
+    "vitals": {
+      "hr": 162,
+      "spo2": 93,
+      "rr": 28,
+      "bp": "90/55",
+      "temp": 37.8
+    },
+    "ui": {
+      "active_hotspots": [
+        "hs_monitor",
+        "hs_patient",
+        "hs_ventilator",
+        "hs_ehr",
+        "hs_call"
+      ],
+      "monitor_alert": true
+    }
+  },
+  "hotspots": [
+    { "id": "hs_monitor", "label": "Μόνιτορ Ζωτικών (Monitor)" },
+    { "id": "hs_patient", "label": "Ασθενής/Κλίνη (Patient)" },
+    { "id": "hs_ventilator", "label": "Αναπνευστήρας (Ventilator)" },
+    { "id": "hs_ehr", "label": "Τερματικό EHR (e-Health)" },
+    { "id": "hs_call", "label": "Κουμπί Κλήσης (Call Button)" }
+  ],
+  "ehr_config": {
+    "forms": {
+      "assessment_form": {
+        "title": "Κλινική Αξιολόγηση",
+        "fields": ["observation", "skin_color", "consciousness"]
+      },
+      "intervention_form": {
+        "title": "Παρεμβάσεις / Ρυθμίσεις",
+        "fields": ["device", "fiO2_setting", "flow_rate"]
+      },
+      "communication_log": {
+        "title": "Ημερολόγιο Επικοινωνίας",
+        "fields": ["recipient", "reason", "outcome"]
+      }
+    }
+  },
+  "rules": {
+    "global_rules": [
+      {
+        "id": "rule_tachycardia_alarm",
+        "condition": {
+          "conditions": {
+            "vitals.hr": { "gt": 150 }
+          }
+        },
+        "effects": [
+          { "type": "ui_visual", "target": "hs_monitor", "state": "blinking_red", "message": "", "style": "", "data": {} },
+          { "type": "ui_toast", "target": "", "state": "", "style": "danger", "message": "ΣΥΝΑΓΕΡΜΟΣ: HR > 150 bpm (Ταχυκαρδία)", "data": {} }
+        ]
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "n1_start",
+      "type": "message",
+      "text": "Βρίσκεστε στη ΜΕΘ, νυχτερινή βάρδια. Ο ασθενής στην κλίνη 3 ενεργοποιεί τον συναγερμό: HR 162 bpm, BP 90/55. Ο ασθενής αναφέρει αίσθημα παλμών και ζάλη.",
+      "options": [],
+      "next_node_id": "n2_initial_assessment",
+      "timeout": null,
+      "gate_requirements": null,
+      "feedback_blocked": "",
+      "feedback_success": "",
+      "effects_on_pass": null,
+      "debrief_config": null
+    },
+    {
+      "id": "n2_initial_assessment",
+      "type": "decision",
+      "text": "Ο ασθενής είναι ωχρός, εφιδρωτικός, με αίσθημα παλμών. Ποια είναι η πρώτη σου ενέργεια;",
+      "options": [
+        {
+          "id": "opt_assess_patient",
+          "label": "Κλινική αξιολόγηση ασθενούς (ABCDE)",
+          "target_hotspot": "hs_patient",
+          "effects": {
+            "score_delta": 15,
+            "state_update": { "assessment_complete": true },
+            "vitals_update": {},
+            "toast": "Αξιολόγηση ABCDE: Αεραγωγός ελεύθερος, ταχύπνοια, ακανόνιστος σφυγμός, ωχρότητα."
+          },
+          "next_node_id": "n3_monitor_check"
+        },
+        {
+          "id": "opt_call_immediately",
+          "label": "Άμεση κλήση ιατρού χωρίς αξιολόγηση",
+          "target_hotspot": "hs_call",
+          "effects": {
+            "score_delta": -15,
+            "state_update": {},
+            "vitals_update": { "hr": 170 },
+            "toast": "Ο ιατρός ζητά πρώτα κλινική αξιολόγηση. Χάνεις χρόνο."
+          },
+          "next_node_id": "n3_monitor_check"
+        }
+      ],
+      "next_node_id": "",
+      "timeout": {
+        "seconds": 25,
+        "on_timeout_effects": {
+          "score_delta": -20,
+          "state_update": {},
+          "vitals_update": { "hr": 182, "bp": "78/48" },
+          "toast": "⚠️ Καθυστέρηση! Ο ασθενής γίνεται αιμοδυναμικά ασταθής."
+        },
+        "next_node_id": "n3_monitor_check"
+      },
+      "gate_requirements": null,
+      "feedback_blocked": "",
+      "feedback_success": "",
+      "effects_on_pass": null,
+      "debrief_config": null
+    },
+    {
+      "id": "n3_monitor_check",
+      "type": "decision",
+      "text": "Το μόνιτορ δείχνει ταχυκαρδία υπερκοιλιακής αιτιολογίας. Η αρτηριακή πίεση πέφτει. Τι κάνεις;",
+      "options": [
+        {
+          "id": "opt_vagal",
+          "label": "Δοκιμή Vagal Maneuvers (Valsalva)",
+          "target_hotspot": "hs_patient",
+          "effects": {
+            "score_delta": 10,
+            "state_update": { "oxygen_adjusted": true },
+            "vitals_update": { "hr": 145, "bp": "95/60" },
+            "toast": "Μερική ανταπόκριση - HR μειώθηκε ελαφρά, αλλά παραμένει ταχυκαρδία."
+          },
+          "next_node_id": "n4_intervention"
+        },
+        {
+          "id": "opt_o2_only",
+          "label": "Χορήγηση Ο2 και αναμονή",
+          "target_hotspot": "hs_ventilator",
+          "effects": {
+            "score_delta": -5,
+            "state_update": {},
+            "vitals_update": { "spo2": 96 },
+            "toast": "Το SpO2 βελτιώθηκε, αλλά η ταχυκαρδία παραμένει. Χρειάζεται κάτι παραπάνω."
+          },
+          "next_node_id": "n4_intervention"
+        },
+        {
+          "id": "opt_ignore",
+          "label": "Αναμονή χωρίς παρέμβαση",
+          "target_hotspot": "hs_monitor",
+          "effects": {
+            "score_delta": -25,
+            "state_update": {},
+            "vitals_update": { "hr": 188, "bp": "72/42", "spo2": 87 },
+            "toast": "⛔ Κρίσιμο! Ο ασθενής γίνεται ασταθής. Απαιτείται άμεση δράση!"
+          },
+          "next_node_id": "n4_intervention"
+        }
+      ],
+      "next_node_id": "",
+      "timeout": {
+        "seconds": 35,
+        "on_timeout_effects": {
+          "score_delta": -20,
+          "state_update": {},
+          "vitals_update": { "hr": 203, "bp": "70/40" },
+          "toast": "⚠️ Καθυστέρηση! Η αιμοδυναμική κατάσταση επιδεινώνεται."
+        },
+        "next_node_id": "n4_intervention"
+      },
+      "gate_requirements": null,
+      "feedback_blocked": "",
+      "feedback_success": "",
+      "effects_on_pass": null,
+      "debrief_config": null
+    },
+    {
+      "id": "n4_intervention",
+      "type": "decision",
+      "text": "Ο ασθενής παραμένει ταχυκαρδικός. Πρέπει να κλιμακώσεις ή να παρέμβεις φαρμακευτικά.",
+      "options": [
+        {
+          "id": "opt_escalate_cardio",
+          "label": "Κλήση Καρδιολόγου - Κλιμάκωση",
+          "target_hotspot": "hs_call",
+          "effects": {
+            "score_delta": 20,
+            "state_update": { "escalation_complete": true },
+            "vitals_update": { "hr": 120, "bp": "105/65" },
+            "toast": "✅ Ο καρδιολόγος χορήγησε αδενοσίνη IV. HR πέφτει σε 120 bpm."
+          },
+          "next_node_id": "n5_gate_documentation_1"
+        },
+        {
+          "id": "opt_fluid_bolus",
+          "label": "Χορήγηση υγρών (Fluid Bolus 500ml)",
+          "target_hotspot": "hs_ventilator",
+          "effects": {
+            "score_delta": -10,
+            "state_update": {},
+            "vitals_update": { "bp": "100/60" },
+            "toast": "Η πίεση βελτιώθηκε ελαφρά, αλλά η ταχυκαρδία παραμένει. Χρειάζεται κλιμάκωση."
+          },
+          "next_node_id": "n5_gate_documentation_1"
+        }
+      ],
+      "next_node_id": "",
+      "timeout": {
+        "seconds": 35,
+        "on_timeout_effects": {
+          "score_delta": -25,
+          "state_update": {},
+          "vitals_update": { "hr": 205, "bp": "65/38" },
+          "toast": "⚠️ Καθυστέρηση! Ο ασθενής βρίσκεται σε κρίσιμη κατάσταση."
+        },
+        "next_node_id": "n5_gate_documentation_1"
+      },
+      "gate_requirements": null,
+      "feedback_blocked": "",
+      "feedback_success": "",
+      "effects_on_pass": null,
+      "debrief_config": null
+    },
+    {
+      "id": "n5_gate_documentation_1",
+      "type": "gate",
+      "text": "🛑 GATE: Τεκμηρίωση αξιολόγησης και παρέμβασης στο EHR.",
+      "description": "Πρέπει να καταγράψεις τα ευρήματα και τις ενέργειες στο ηλεκτρονικό φάκελο.",
+      "options": [],
+      "next_node_id": "n6_reassessment",
+      "timeout": null,
+      "gate_requirements": {
+        "target_hotspot": "hs_ehr",
+        "required_forms": [
+          { "form_id": "assessment_form", "fields": ["observation", "consciousness"] },
+          { "form_id": "intervention_form", "fields": ["device"] }
+        ]
+      },
+      "feedback_blocked": "⚠️ Δεν μπορείς να προχωρήσεις χωρίς να τεκμηριώσεις. Συμπλήρωσε το EHR.",
+      "feedback_success": "✅ Τεκμηρίωση ολοκληρώθηκε.",
+      "effects_on_pass": {
+        "score_delta": 10,
+        "state_update": { "documentation_1_complete": true },
+        "vitals_update": {},
+        "toast": ""
+      },
+      "debrief_config": null
+    },
+    {
+      "id": "n6_reassessment",
+      "type": "message",
+      "text": "10 λεπτά μετά: Ο HR σταθεροποιήθηκε στα 95 bpm, BP 115/70. Ο ασθενής αισθάνεται καλύτερα. Πρέπει να ενημερώσεις για την κλήση και την εξέλιξη.",
+      "options": [],
+      "next_node_id": "n7_final_decision",
+      "timeout": null,
+      "gate_requirements": null,
+      "feedback_blocked": "",
+      "feedback_success": "",
+      "effects_on_pass": null,
+      "debrief_config": null
+    },
+    {
+      "id": "n7_final_decision",
+      "type": "decision",
+      "text": "Ο ασθενής σταθεροποιήθηκε. Πρέπει να αποφασίσεις για τη συνέχεια της παρακολούθησης.",
+      "options": [
+        {
+          "id": "opt_continuous_monitoring",
+          "label": "Συνεχής monitoring + ενημέρωση επόμενης βάρδιας",
+          "target_hotspot": "hs_monitor",
+          "effects": {
+            "score_delta": 10,
+            "state_update": {},
+            "vitals_update": { "hr": 88, "bp": "120/75", "spo2": 97 },
+            "toast": "✅ Σωστή απόφαση. Ο ασθενής παρακολουθείται στενά."
+          },
+          "next_node_id": "n8_gate_documentation_2"
+        },
+        {
+          "id": "opt_discharge_early",
+          "label": "Μεταφορά σε απλή κλίνη",
+          "target_hotspot": "hs_patient",
+          "effects": {
+            "score_delta": -20,
+            "state_update": {},
+            "vitals_update": { "hr": 175, "bp": "85/55" },
+            "toast": "⚠️ Πρόωρη μεταφορά! Χωρίς στενή παρακολούθηση η αρρυθμία υποτροπιάζει."
+          },
+          "next_node_id": "n8_gate_documentation_2"
+        }
+      ],
+      "next_node_id": "",
+      "timeout": {
+        "seconds": 30,
+        "on_timeout_effects": {
+          "score_delta": -20,
+          "state_update": {},
+          "vitals_update": { "hr": 203, "bp": "70/45" },
+          "toast": "⚠️ Καθυστέρηση! Η ταχυκαρδία επανέρχεται απότομα."
+        },
+        "next_node_id": "n8_gate_documentation_2"
+      },
+      "gate_requirements": null,
+      "feedback_blocked": "",
+      "feedback_success": "",
+      "effects_on_pass": null,
+      "debrief_config": null
+    },
+    {
+      "id": "n8_gate_documentation_2",
+      "type": "gate",
+      "text": "🛑 GATE: Καταγραφή Επικοινωνίας & Τελική Τεκμηρίωση.",
+      "description": "Κατάγραψε την κλήση και το αποτέλεσμα στο Communication Log.",
+      "options": [],
+      "next_node_id": "n9_end",
+      "timeout": null,
+      "gate_requirements": {
+        "target_hotspot": "hs_ehr",
+        "required_forms": [
+          { "form_id": "communication_log", "fields": ["recipient", "reason", "outcome"] }
+        ]
+      },
+      "feedback_blocked": "⚠️ Πρέπει να καταγράψεις την επικοινωνία στο EHR πριν ολοκληρωθεί το σενάριο.",
+      "feedback_success": "✅ Τελική τεκμηρίωση ολοκληρώθηκε.",
+      "effects_on_pass": {
+        "score_delta": 5,
+        "state_update": { "documentation_2_complete": true },
+        "vitals_update": {},
+        "toast": ""
+      },
+      "debrief_config": null
+    },
+    {
+      "id": "n9_end",
+      "type": "end",
+      "text": "Το σενάριο ολοκληρώθηκε. Ο ασθενής σταθεροποιήθηκε επιτυχώς.",
+      "options": [],
+      "next_node_id": "",
+      "timeout": null,
+      "gate_requirements": null,
+      "feedback_blocked": "",
+      "feedback_success": "",
+      "effects_on_pass": null,
+      "debrief_config": {
+        "show_score": true,
+        "show_decision_path": true,
+        "highlight_missed_docs": true,
+        "export_log": true
+      }
+    }
+  ],
+  "logging": {
+    "enabled": true,
+    "log_events": ["NODE_ENTER", "HOTSPOT_INTERACTION", "OPTION_SELECTED", "EHR_SUBMIT", "VITALS_CHANGE", "SCORE_CHANGE"]
+  }
+}
