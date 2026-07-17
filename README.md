@@ -28,7 +28,7 @@
 3. Πατήστε Play
 
 **Standalone:**
-Κατεβάστε το .exe από τα [Releases](https://github.com/chatsik/ICU-XR/releases/tag/ICU-XR).
+Κατεβάστε το .exe από τα [Releases](https://github.com/htkk27/ICU-XR/releases/tag/ICU-XR).
 
 ## Πλήκτρα
 
